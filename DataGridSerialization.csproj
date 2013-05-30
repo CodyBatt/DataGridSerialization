@@ -7,8 +7,8 @@
     <ProjectGuid>{4EFB599D-9083-44F0-B538-E47D52E5BF0B}</ProjectGuid>
     <OutputType>WinExe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>ColumnGenerator</RootNamespace>
-    <AssemblyName>ColumnGenerator</AssemblyName>
+    <RootNamespace>DataGridSerialization</RootNamespace>
+    <AssemblyName>DataGridSerialization</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <ProjectTypeGuids>{60dc8134-eba5-43b8-bcc9-bb4bc16c2548};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
@@ -107,8 +107,10 @@
       <DependentUpon>App.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="BlobCacheRepository.cs" />
     <Compile Include="CollectionViewModel.cs" />
     <Compile Include="ColumnManager.cs" />
+    <Compile Include="GridSettings.cs" />
     <Compile Include="ItemViewModel.cs" />
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>

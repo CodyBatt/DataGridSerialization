@@ -8,7 +8,7 @@
             <RowDefinition/>
             <RowDefinition/>
         </Grid.RowDefinitions>
-        <local:ColumnManager SerializationId="Grid1" DataGrid="{Binding ElementName=DataGrid1}"/>
+        <local:ColumnManager DataGrid="{Binding ElementName=DataGrid1}" />
         <!--
         <local:ColumnManager SerializationId="Grid2" DataGrid="{Binding ElementName=DataGrid2}"/>
         -->

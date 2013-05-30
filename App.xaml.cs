@@ -17,7 +17,7 @@ namespace DataGridSerialization
     {
         public App()
         {
-            BlobCache.ApplicationName = "ColumnGenerator";
+            BlobCache.ApplicationName = "DataGridSerialization";
             RxApp.ConfigureServiceLocator((t, s) => null, (t, s) => null, (c, t, s) => { });
 
         }

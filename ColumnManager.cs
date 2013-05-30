@@ -25,38 +25,31 @@ using ReactiveUI.Xaml;
 
 namespace DataGridSerialization
 {
-    public class ColumnDescriptor : INotifyPropertyChanged
+    public class ColumnSettingsViewModel : ReactiveObject
     {
         public string Id;
         public string DisplayName;
         public int Order;
         public double? Width;
-
         #region Property Visible
         private bool _pVisible;
         public bool Visible
         {
             get { return _pVisible; }
-            set
-            {
-                if (value != _pVisible)
-                {
-                    _pVisible = value;
-                    if (PropertyChanged != null)
-                    {
-                        PropertyChanged(this,new PropertyChangedEventArgs("Visible"));
-                    }
-                }
-            }
+            set { this.RaiseAndSetIfChanged(ref _pVisible, value); }
         }
         #endregion
 
-        public ColumnDescriptor()
+        public ColumnSettingsViewModel(ColumnSettings cs)
         {
-            int breakhere = 100;
+            Id = cs.Id;
+            DisplayName = cs.DisplayName;
+            Order = cs.Order;
+            Width = cs.Width;
+            Visible = cs.Visible;
         }
 
-        public ColumnDescriptor(DataGridColumn col)
+        public ColumnSettingsViewModel(DataGridColumn col)
         {
             Assign(col);
         }
@@ -99,8 +92,6 @@ namespace DataGridSerialization
             // TODO: Return the localized string
             return displayName;
         }
-
-        public event PropertyChangedEventHandler PropertyChanged;
     }
 
     public class ColumnManager : Control
@@ -125,25 +116,75 @@ namespace DataGridSerialization
         
         public ColumnManager()
         {
-            Application.Current.Exit += OnApplicationExit;
+            SettingsRepository = new BlobCacheRepository();
+            Loaded += ColumnManager_Loaded;
         }
 
-        
+        void ColumnManager_Loaded(object sender, RoutedEventArgs e)
+        {
+            // Have grid-columns already been auto-generated?
+            Application.Current.Exit += OnApplicationExit;
+            
+        }
+
+        #region DependencyProperty: SettingsRepository
+        public static readonly DependencyProperty SettingsRepositoryProperty =
+            DependencyProperty.Register("SettingsRepository", typeof (IGridSettingsRepository), typeof (ColumnManager), new PropertyMetadata(default(IGridSettingsRepository)));
+
+        public IGridSettingsRepository SettingsRepository
+        {
+            get { return (IGridSettingsRepository) GetValue(SettingsRepositoryProperty); }
+            set { SetValue(SettingsRepositoryProperty, value); }
+        }
+        #endregion
 
         void OnApplicationExit(object sender, ExitEventArgs e)
         {
             SaveSettings();
         }
 
-        async void SaveSettings()
+        void SaveSettings()
         {
             if (DataGrid == null) return;
-            CustomSettings.Clear();
+            var settings = new GridSettings();
             foreach (var col in DataGrid.Columns)
             {
-                CustomSettings.Add(new ColumnDescriptor(col));
+                var columnSettings = new ColumnSettings()
+                    {
+                        DisplayName = col.Header as string,
+                        Id = GetColumnId(col),
+                        Order = col.DisplayIndex,
+                        Visible = col.Visibility == Visibility.Visible,
+                        Width = col.ActualWidth
+                    };
+                settings.ColumnSettings.Add(columnSettings);
+                if (col.SortDirection == null) continue;
+
+                settings.ColumnSort = new ColumnSort
+                    {
+                        Direction = col.SortDirection.Value,
+                        Index = col.DisplayIndex
+                    };
             }
-            await BlobCache.LocalMachine.InsertObject(SerializationId, CustomSettings);
+            SettingsRepository.Save(SerializationId, settings);
+        }
+
+        async void LoadSettings()
+        {
+            var settings = await SettingsRepository.LoadAsync(SerializationId);
+            if (settings == null)
+            {
+                _settingsLoaded = true;
+                return;
+            }
+
+            ColumnSettings = new ReactiveCollection<ColumnSettingsViewModel>();
+            foreach (var columnSettings in settings.ColumnSettings)
+            {
+                ColumnSettings.Add(new ColumnSettingsViewModel(columnSettings));
+            }
+            ColumnSort = settings.ColumnSort;
+            _settingsLoaded = true;
         }
 
         private bool _settingsLoaded = false;
@@ -165,33 +206,36 @@ namespace DataGridSerialization
 
             var columnId = e.PropertyName;
             SetColumnId(e.Column, columnId);
-            if( CustomSettings == null)
-                CustomSettings = new ObservableCollection<ColumnDescriptor>();
-            var cd = CustomSettings.FirstOrDefault(x => x.Id == columnId);
+            e.Column.Header = GetLocalizedHeader(columnId);
+
+            if (ColumnSettings == null) return;
+            var cd = ColumnSettings.FirstOrDefault(x => x.Id == columnId);
             if (cd != null)
             {
-                cd.ApplyColumnSettings(e.Column);
+                cd.ApplyColumnSettings(e.Column);                
             }
             else
             {
-                cd = new ColumnDescriptor(e.Column);
-                CustomSettings.Add(cd);
+                e.Cancel = true;
             }
-            cd.SetColumnHeader(SerializationId, e.Column);
-            
         }
 
-        #region DependencyProperty: CustomSettings
-        public static readonly DependencyProperty CustomSettingsProperty =
-            DependencyProperty.Register("CustomSettings", typeof(ObservableCollection<ColumnDescriptor>), typeof(ColumnManager), new PropertyMetadata(default(ObservableCollection<ColumnDescriptor>)));
-
-        public ObservableCollection<ColumnDescriptor> CustomSettings
+        string GetLocalizedHeader(string columnId)
         {
-            get { return (ObservableCollection<ColumnDescriptor>)GetValue(CustomSettingsProperty); }
-            set { SetValue(CustomSettingsProperty, value); }
+            // TODO: Localize this
+            return SerializationId + "_" + columnId;
+        }
+
+        #region DependencyProperty: ColumnSettings
+        public static readonly DependencyProperty ColumnSettingsProperty =
+            DependencyProperty.Register("ColumnSettings", typeof(ReactiveCollection<ColumnSettingsViewModel>), typeof(ColumnManager), new PropertyMetadata(default(ReactiveCollection<ColumnSettingsViewModel>)));
+
+        public ReactiveCollection<ColumnSettingsViewModel> ColumnSettings
+        {
+            get { return (ReactiveCollection<ColumnSettingsViewModel>)GetValue(ColumnSettingsProperty); }
+            set { SetValue(ColumnSettingsProperty, value); }
         }
         #endregion
-
         #region DependencyProperty: DataGrid
         public static readonly DependencyProperty DataGridProperty =
             DependencyProperty.Register("DataGrid", typeof (DataGrid), typeof (ColumnManager), new PropertyMetadata(DataGridChanged));
@@ -203,6 +247,9 @@ namespace DataGridSerialization
         private static void DataGridChanged(object sender, DependencyPropertyChangedEventArgs args)
         {
             var cm = sender as ColumnManager;
+            if (cm == null || cm.DataGrid == null || string.IsNullOrEmpty(cm.DataGrid.Name)) return;
+            cm.SerializationId = cm.DataGrid.Name;
+            cm.LoadSettings();
             if (cm.DataGrid.AutoGenerateColumns)
             {
                 cm.DataGrid.AutoGeneratingColumn += cm.DataGrid_AutoGeneratingColumns;
@@ -214,13 +261,18 @@ namespace DataGridSerialization
 
         void DataGrid_AutoGeneratedColumns(object sender, EventArgs e)
         {
+            if (ColumnSettings == null) return;
             foreach (var col in DataGrid.Columns)
             {
                 var columnId = GetColumnId(col);
                 if (columnId == null) continue;
-                var cd = CustomSettings.FirstOrDefault(x => x.Id == columnId);
+                var cd = ColumnSettings.FirstOrDefault(x => x.Id == columnId);
                 if (cd == null) continue;
                 cd.ApplyColumnOrdering(DataGrid.Columns.Count, col);
+            }
+            if (ColumnSort != null)
+            {
+                DataGrid.Columns[ColumnSort.Index].SortDirection = ColumnSort.Direction;
             }
             DataGrid.ContextMenu = CreateContextMenu();
         }
@@ -234,7 +286,7 @@ namespace DataGridSerialization
         {
             var retval = new ContextMenu();
             
-            foreach (var cd in CustomSettings)
+            foreach (var cd in ColumnSettings)
             {
                 var item = new MenuItem();
                 item.Header = cd.DisplayName;
@@ -260,7 +312,7 @@ namespace DataGridSerialization
                     _pToggleColumnVisibility = new ReactiveCommand( /* Observable for CanExecute Here */);
                     _pToggleColumnVisibility.Subscribe((param) =>
                     {
-                        var cd = param as ColumnDescriptor;
+                        var cd = param as ColumnSettingsViewModel;
                         if (cd == null) return;
                         cd.Visible = !cd.Visible;
                         var col = DataGrid.Columns.FirstOrDefault(x => GetColumnId(x) == cd.Id);
@@ -275,35 +327,8 @@ namespace DataGridSerialization
         #endregion
         #endregion
 
-        #region DependencyProperty: SerializationId
-        public static readonly DependencyProperty SerializationIdProperty =
-            DependencyProperty.Register("SerializationId", typeof(string), typeof(ColumnManager), new PropertyMetadata(SerializationIdChanged));
-        public string SerializationId
-        {
-            get { return (string) GetValue(SerializationIdProperty); }
-            set { SetValue(SerializationIdProperty, value); }
-        }
-        private static void SerializationIdChanged(object sender, DependencyPropertyChangedEventArgs args)
-        {
-            var cm = sender as ColumnManager;
-            BlobCache.LocalMachine.GetObjectAsync<ObservableCollection<ColumnDescriptor>>(cm.SerializationId)
-                     .Subscribe(settings => Application.Current.Dispatcher.Invoke(() =>
-                         {
-                             cm.CustomSettings = new ObservableCollection<ColumnDescriptor>();
-                             foreach (var setting in settings)
-                             {
-                                 cm.CustomSettings.Add(setting);
-                             }
-                             cm._settingsLoaded = true;
-                         }, DispatcherPriority.Normal), 
-                        error =>
-                        {
-                           cm._settingsLoaded = true;
-                        });
-        }
-        #endregion
-
-        
+        private string SerializationId { get; set; }
+        private ColumnSort ColumnSort { get; set; }
     }
 
 }
