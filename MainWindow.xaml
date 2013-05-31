@@ -6,15 +6,25 @@
         <Grid.RowDefinitions>
             <RowDefinition/>
             <RowDefinition/>
-            <RowDefinition/>
         </Grid.RowDefinitions>
         <local:ColumnManager DataGrid="{Binding ElementName=DataGrid1}" />
-        <!--
-        <local:ColumnManager SerializationId="Grid2" DataGrid="{Binding ElementName=DataGrid2}"/>
-        -->
+        <local:ColumnManager DataGrid="{Binding ElementName=DataGrid2}"/>
+        
         <DataGrid Name="DataGrid1" ItemsSource="{Binding Items}" RowHeaderWidth="0" AutoGenerateColumns="True" Margin="0,0,0,10"/>
+        <DataGrid Name="DataGrid2" ItemsSource="{Binding Items}" RowHeaderWidth="0" AutoGenerateColumns="False" Grid.Row="1">
+            <DataGrid.Columns>
+            <DataGridTextColumn
+                Header="The Person's Name"
+                Width="SizeToHeader"
+                Binding="{Binding Name}"/>
+            <DataGridTextColumn
+                Header="The Person's Age"
+                Width="SizeToHeader"
+                Binding="{Binding Age}"/>
+            </DataGrid.Columns>
+        </DataGrid>
+                  
         <!--
-        <DataGrid Name="DataGrid2" ItemsSource="{Binding Items}" RowHeaderWidth="0" AutoGenerateColumns="True" Grid.Row="1"/>
         <DataGrid Name="DataGrid3" ItemsSource="{Binding Items}" RowHeaderWidth="0" AutoGenerateColumns="False" Grid.Row="2"></DataGrid>
         -->
     </Grid>

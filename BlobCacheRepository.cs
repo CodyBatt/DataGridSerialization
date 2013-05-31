@@ -8,7 +8,7 @@ namespace DataGridSerialization
 {
     class BlobCacheRepository : IGridSettingsRepository
     {
-        public async Task<GridSettings> LoadAsync(string identifier)
+        public GridSettings Load(string identifier)
         {
             var obs = BlobCache.LocalMachine.GetObjectAsync<GridSettings>(identifier);
             var result = obs.ToTask();

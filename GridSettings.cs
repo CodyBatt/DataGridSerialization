@@ -34,7 +34,7 @@ namespace DataGridSerialization
 
     public interface IGridSettingsRepository
     {
-        Task<GridSettings> LoadAsync(string identifier);
+        GridSettings Load(string identifier);
         void Save(string identifier, GridSettings toSave);
     }
 }

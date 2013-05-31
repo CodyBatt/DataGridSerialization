@@ -1,25 +1,10 @@
 ﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.ComponentModel;
 using System.Linq;
-using System.Reactive.Linq;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
-using System.Windows.Threading;
-using Akavache;
-using Newtonsoft.Json;
 using ReactiveUI;
 using ReactiveUI.Xaml;
 
@@ -49,20 +34,6 @@ namespace DataGridSerialization
             Visible = cs.Visible;
         }
 
-        public ColumnSettingsViewModel(DataGridColumn col)
-        {
-            Assign(col);
-        }
-
-        public void Assign(DataGridColumn col)
-        {
-            Id = ColumnManager.GetColumnId(col);
-            Order = col.DisplayIndex;
-            Visible = col.Visibility == Visibility.Visible;
-            Width = col.ActualWidth;
-            DisplayName = col.Header as string;
-        }
-
         public void ApplyColumnSettings(DataGridColumn col)
         {
             col.Width = ConvertToDataGridLength(Width);
@@ -75,22 +46,9 @@ namespace DataGridSerialization
                 col.DisplayIndex = Order;
         }
 
-        public void SetColumnHeader(string serializationId, DataGridColumn col)
-        {
-            DisplayName = PropertyNameToDisplayName(serializationId, ColumnManager.GetColumnId(col));
-            col.Header = DisplayName;
-        }
-
         private static DataGridLength ConvertToDataGridLength(double? width)
         {
             return width == null ? DataGridLength.SizeToCells : new DataGridLength(width.Value);
-        }
-
-        public static string PropertyNameToDisplayName(string serializationId, string propertyName)
-        {
-            var displayName = serializationId + "_" + propertyName;
-            // TODO: Return the localized string
-            return displayName;
         }
     }
 
@@ -117,14 +75,7 @@ namespace DataGridSerialization
         public ColumnManager()
         {
             SettingsRepository = new BlobCacheRepository();
-            Loaded += ColumnManager_Loaded;
-        }
-
-        void ColumnManager_Loaded(object sender, RoutedEventArgs e)
-        {
-            // Have grid-columns already been auto-generated?
             Application.Current.Exit += OnApplicationExit;
-            
         }
 
         #region DependencyProperty: SettingsRepository
@@ -169,12 +120,12 @@ namespace DataGridSerialization
             SettingsRepository.Save(SerializationId, settings);
         }
 
-        async void LoadSettings()
+        void LoadSettings()
         {
-            var settings = await SettingsRepository.LoadAsync(SerializationId);
+            var settings = SettingsRepository.Load(SerializationId);
             if (settings == null)
             {
-                _settingsLoaded = true;
+                //_settingsLoaded = true;
                 return;
             }
 
@@ -184,14 +135,14 @@ namespace DataGridSerialization
                 ColumnSettings.Add(new ColumnSettingsViewModel(columnSettings));
             }
             ColumnSort = settings.ColumnSort;
-            _settingsLoaded = true;
+            //_settingsLoaded = true;
         }
 
-        private bool _settingsLoaded = false;
+        private bool _settingsLoaded;
         void DataGrid_AutoGeneratingColumns(object sender, DataGridAutoGeneratingColumnEventArgs e)
         {
-            while (!_settingsLoaded)
-                Thread.Sleep(50);
+            //while (!_settingsLoaded)
+           //     Thread.Sleep(50);
 
             // Skip IObservable properties "Changing" "Changed"
             var pt = e.PropertyType;
@@ -207,17 +158,52 @@ namespace DataGridSerialization
             var columnId = e.PropertyName;
             SetColumnId(e.Column, columnId);
             e.Column.Header = GetLocalizedHeader(columnId);
+            ApplyColumnSettings(e.Column, columnId);
+        }
 
-            if (ColumnSettings == null) return;
+        private void HandleCustomColumns()
+        {
+            foreach (var col in DataGrid.Columns)
+            {
+                var boundColumn = col as DataGridBoundColumn;
+                if (boundColumn == null) continue;
+                var binding = boundColumn.Binding as Binding;
+                if (binding == null) continue;
+                var columnId = binding.Path.Path;
+                SetColumnId(col, columnId);
+                ApplyColumnSettings(col, columnId);
+            }
+            ApplyGridSettings();
+        }
+
+        private bool ApplyColumnSettings(DataGridColumn col, string columnId)
+        {
+            if (ColumnSettings == null) return false;
             var cd = ColumnSettings.FirstOrDefault(x => x.Id == columnId);
             if (cd != null)
             {
-                cd.ApplyColumnSettings(e.Column);                
+                cd.ApplyColumnSettings(col);
+                return false;
             }
-            else
+            return true;
+        }
+
+        private void ApplyGridSettings()
+        {
+            if (ColumnSettings == null) return;
+            foreach (var col in DataGrid.Columns)
             {
-                e.Cancel = true;
+                var columnId = GetColumnId(col);
+                if (columnId == null) continue;
+                var cd = ColumnSettings.FirstOrDefault(x => x.Id == columnId);
+                if (cd == null) continue;
+                cd.ApplyColumnOrdering(DataGrid.Columns.Count, col);
             }
+            if (ColumnSort != null)
+            {
+                DataGrid.Columns[ColumnSort.Index].SortDirection = ColumnSort.Direction;
+            }
+            DataGrid.ContextMenu = CreateContextMenu();
         }
 
         string GetLocalizedHeader(string columnId)
@@ -255,26 +241,17 @@ namespace DataGridSerialization
                 cm.DataGrid.AutoGeneratingColumn += cm.DataGrid_AutoGeneratingColumns;
                 cm.DataGrid.AutoGeneratedColumns += cm.DataGrid_AutoGeneratedColumns;
             }
+            else
+            {
+                cm.HandleCustomColumns();
+            }
 
             cm.DataGrid.Unloaded += cm.DataGrid_Unloaded;
         }
 
         void DataGrid_AutoGeneratedColumns(object sender, EventArgs e)
         {
-            if (ColumnSettings == null) return;
-            foreach (var col in DataGrid.Columns)
-            {
-                var columnId = GetColumnId(col);
-                if (columnId == null) continue;
-                var cd = ColumnSettings.FirstOrDefault(x => x.Id == columnId);
-                if (cd == null) continue;
-                cd.ApplyColumnOrdering(DataGrid.Columns.Count, col);
-            }
-            if (ColumnSort != null)
-            {
-                DataGrid.Columns[ColumnSort.Index].SortDirection = ColumnSort.Direction;
-            }
-            DataGrid.ContextMenu = CreateContextMenu();
+            ApplyGridSettings();
         }
 
         void DataGrid_Unloaded(object sender, RoutedEventArgs e)
@@ -285,7 +262,6 @@ namespace DataGridSerialization
         ContextMenu CreateContextMenu()
         {
             var retval = new ContextMenu();
-            
             foreach (var cd in ColumnSettings)
             {
                 var item = new MenuItem();
@@ -301,26 +277,27 @@ namespace DataGridSerialization
         }
 
         #region Command: ToggleColumnVisibility
-        private IReactiveCommand _pToggleColumnVisibility = null;
-        public IReactiveCommand ToggleColumnVisibility
+        private ICommand _pToggleColumnVisibility;
+        public ICommand ToggleColumnVisibility
         {
             get
             {
-                if (_pToggleColumnVisibility == null)
-                {
-                    
-                    _pToggleColumnVisibility = new ReactiveCommand( /* Observable for CanExecute Here */);
-                    _pToggleColumnVisibility.Subscribe((param) =>
-                    {
-                        var cd = param as ColumnSettingsViewModel;
-                        if (cd == null) return;
-                        cd.Visible = !cd.Visible;
-                        var col = DataGrid.Columns.FirstOrDefault(x => GetColumnId(x) == cd.Id);
-                        if (col == null) return;
-                        col.Visibility = cd.Visible ? Visibility.Visible : Visibility.Collapsed;
-                    });
-                }
-                return _pToggleColumnVisibility;
+                return _pToggleColumnVisibility ??
+                    (_pToggleColumnVisibility = new RelayCommand<ColumnSettingsViewModel>(
+                        (vm) =>
+                            {
+                                if (vm == null) return;
+                                vm.Visible = !vm.Visible;
+                                var col = DataGrid.Columns.FirstOrDefault(x => GetColumnId(x) == vm.Id);
+                                if (col == null) return;
+                                col.Visibility = vm.Visible ? Visibility.Visible : Visibility.Collapsed;
+                            },
+                        (vm) =>
+                            {
+                                if (vm == null) return false;
+                                var visibleColumns = ColumnSettings.Count(x => x.Visible);
+                                return visibleColumns != 1 || !vm.Visible;
+                            }));
             }
         }
         #endregion
