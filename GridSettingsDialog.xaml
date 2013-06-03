@@ -1,0 +1,56 @@
+﻿<Window x:Class="DataGridSerialization.GridSettingsDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:dataGridSerialization="clr-namespace:DataGridSerialization"
+        xmlns:componentModel="clr-namespace:System.ComponentModel;assembly=WindowsBase"
+        xmlns:local="clr-namespace:DataGridSerialization"
+        Title="GridSettingsDialog" Height="460" Width="355">
+    <Window.Resources>
+        <local:BooleanInverseConverter x:Key="BooleanInverse"/>
+        <DataTemplate x:Key="ColumnListItemTemplate" DataType="dataGridSerialization:ColumnSettingsViewModel">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition/>
+                </Grid.ColumnDefinitions>
+                <CheckBox IsChecked="{Binding Visible}" IsEnabled="{Binding Required, Converter={StaticResource BooleanInverse}}"/>
+                <TextBlock Text="{Binding DisplayName}" Grid.Column="2"/>
+            </Grid>
+        </DataTemplate>
+    </Window.Resources>
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid Margin="0,0,0,10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition/>
+            </Grid.RowDefinitions>
+            <TextBlock Height="35">Select the columns to display for this table.</TextBlock>
+            <TextBlock Grid.Row="1" Height="20">Columns:</TextBlock>
+            <Grid Grid.Row="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>                
+                <ListBox Name="SettingsList" ItemsSource="{Binding SettingsView}" ItemTemplate="{StaticResource ColumnListItemTemplate}"/>
+                <StackPanel Grid.Column="1" Margin="10,0">
+                    <Button Padding="4,2" Command="{Binding MoveUp}" CommandParameter="{Binding ElementName=SettingsList, Path=SelectedItem}">Move Up</Button>
+                    <Button Margin="0,5,0,0" Padding="4,2" Command="{Binding MoveDown}" CommandParameter="{Binding ElementName=SettingsList, Path=SelectedItem}">Move Down</Button>
+                    <Button Margin="0,5,0,0" Padding="4,2" Command="{Binding ShowColumn}" CommandParameter="{Binding ElementName=SettingsList, Path=SelectedItem}">Show</Button>
+                    <Button Margin="0,5,0,0" Padding="4,2" Command="{Binding HideColumn}" CommandParameter="{Binding ElementName=SettingsList, Path=SelectedItem}">Hide</Button>
+                </StackPanel>
+            </Grid>
+        </Grid>
+        <StackPanel Grid.Row="1">
+        <Separator/>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Width="75" Height="22" IsDefault="True"  Margin="0,10,10,0" Click="OkClick">OK</Button>
+            <Button Width="75" Height="22" IsCancel="True"   Margin="0,10,0,0" Content="Cancel"/>
+        </StackPanel>
+        </StackPanel>
+    </Grid>
+</Window>

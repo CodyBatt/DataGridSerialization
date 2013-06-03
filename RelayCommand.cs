@@ -8,15 +8,15 @@ using System.Windows.Input;
 
 namespace DataGridSerialization
 {
-    public class RelayCommand<T> : ICommand
+    public class RelayCommand : ICommand
     {
         #region Fields
-        private readonly Action<T> _execute;
-        private readonly Predicate<T> _canExecute;
+        private readonly Action<object> _execute;
+        private readonly Predicate<object> _canExecute;
         #endregion // Fields
 
         #region Constructors
-        public RelayCommand(Action<T> execute)
+        public RelayCommand(Action<object> execute)
             : this(execute, null)
         {}
 
@@ -25,7 +25,7 @@ namespace DataGridSerialization
         /// </summary>
         /// <param name="execute">The execution logic.</param>
         /// <param name="canExecute">The execution status logic.</param>
-        public RelayCommand(Action<T> execute, Predicate<T> canExecute)
+        public RelayCommand(Action<object> execute, Predicate<object> canExecute)
         {
             if (execute == null)
                 throw new ArgumentNullException("execute");
@@ -39,7 +39,7 @@ namespace DataGridSerialization
         [DebuggerStepThrough]
         public bool CanExecute(object parameter)
         {
-            return _canExecute == null || _canExecute((T)parameter);
+            return _canExecute == null || _canExecute(parameter);
         }
         public event EventHandler CanExecuteChanged
         {
@@ -48,7 +48,7 @@ namespace DataGridSerialization
         }
         public void Execute(object parameter)
         {
-            _execute((T)parameter);
+            _execute(parameter);
         }
         #endregion // ICommand Members
     }

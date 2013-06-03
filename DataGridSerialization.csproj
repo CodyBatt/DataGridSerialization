@@ -99,7 +99,16 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="BooleanInverseConverter.cs" />
+    <Compile Include="ColumnSettingsViewModel.cs" />
+    <Compile Include="GridSettingsDialog.xaml.cs">
+      <DependentUpon>GridSettingsDialog.xaml</DependentUpon>
+    </Compile>
     <Compile Include="RelayCommand.cs" />
+    <Page Include="GridSettingsDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
